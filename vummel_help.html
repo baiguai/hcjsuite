@@ -1,0 +1,2057 @@
+<!DOCTYPE html><html><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1" name="viewport">
+<title>Vummel Help</title>
+<style>
+        :root {
+            --bg: #000;
+            --fg: #f5f5f5;
+            --muted: #9aa0a6;
+            --accent: #00d1b2;
+            --danger: #ff5577;
+            --sel-bg: #111827;
+            --border: #222;
+        }
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--fg);
+            font: 14px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            display: flex;
+            min-height: 100vh;
+        }
+        .app {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            grid-template-rows: auto 1fr;
+            grid-template-areas:
+            "header header"
+            "tree editor";
+            width: 100%;
+        }
+        header {
+            grid-area: header;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            user-select: none;
+        }
+        header .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .dot.green { background: var(--accent); }
+        .dot.red { background: var(--danger); }
+        .kbd-hint { color: var(--muted); }
+
+        .tree {
+            grid-area: tree;
+            border-right: 1px solid var(--border);
+            min-width: 240px;
+            overflow: auto;
+            padding: 8px;
+        }
+        .tree ul { list-style: none; margin: 0; padding-left: 16px; }
+        .tree li { margin: 2px 0; }
+
+        .node {
+            display: flex; align-items: center; gap: 8px;
+            padding: 2px 6px; border-radius: 2px;
+            cursor: default; user-select: none;
+        }
+        .node .twisty { width: 12px; display: inline-block; text-align: center; color: var(--muted); }
+        .node .icon { width: 16px; height: 16px; display: inline-block; color: var(--muted); }
+        .node .title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .node.selected { background: var(--sel-bg); outline: 1px dashed #333; }
+
+        .editor {
+            grid-area: editor;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            min-width: 0;
+        }
+        .status {
+            padding: 6px 10px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; gap: 12px;
+        }
+        .status .pill { padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); }
+
+        textarea#editorArea {
+            width: 100%; height: 100%;
+            background: transparent; color: var(--fg);
+            border: none; outline: none; resize: none;
+            padding: 12px;
+            font: inherit; line-height: 1.5;
+            tab-size: 2;
+        }
+        .footer { border-top: 1px solid var(--border); padding: 6px 10px; color: var(--muted); }
+
+        .dim { color: var(--muted); }
+        .accent { color: var(--accent); }
+        .danger { color: var(--danger); }
+
+        /* Searching */
+        .search-dialog {
+            position: fixed;
+            top: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            max-height: 70%;
+            overflow: hidden;
+            background: #222;
+            color: #fff;
+            border: 2px solid #444;
+            border-radius: 2px;
+            z-index: 9999;
+            font-family: monospace;
+            padding: 10px;
+            display: none;
+            flex-direction: column;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+        }
+        .search-dialog input {
+            padding: 5px;
+            margin-bottom: 10px;
+            background: #111;
+            color: #fff;
+            border: 1px solid #555;
+            width: 100%;
+        }
+        .search-results {
+            overflow-y: auto;
+            flex: 1;
+            border-top: 1px solid #333;
+            border-bottom: 1px solid #333;
+        }
+        .search-results div {
+            padding: 5px 8px;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .search-results div.selected {
+            background: #444;
+        }
+
+        /* Links Dialog */
+        #linksDialog {
+            display: none;
+            position: fixed;
+            top: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            max-height: 70%;
+            background: #222;
+            color: #fff;
+            border: 2px solid #444;
+            border-radius: 2px;
+            padding: 20px;
+            z-index: 9999;
+            font-family: monospace;
+            overflow-y: auto;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+        }
+        #linksDialog h3 {
+            margin-top: 0;
+        }
+        #linksList a {
+            display: block;
+            color: #00d1b2;
+            text-decoration: underline;
+            margin-bottom: 6px;
+            word-break: break-all;
+        }
+        #linksDialog .close {
+            margin-top: 10px;
+            color: #ccc;
+            cursor: pointer;
+            display: inline-block;
+        }
+
+        /* Search/Replace Dialog */
+        #replaceDialog {
+            display: none;
+            position: fixed;
+            top: 15%;
+            left: 5px;
+            /* transform: translateX(-50%); */
+            width: 230px;
+            background: #222;
+            color: #fff;
+            border: 2px solid #444;
+            border-radius: 2px; /* per your request */
+            padding: 16px;
+            z-index: 9999;
+            font-family: monospace;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+        }
+        #replaceDialog h3 {
+            margin-top: 0;
+        }
+        #replaceDialog label {
+            display: block;
+            margin-bottom: 4px;
+        }
+        #replaceDialog input {
+            width: 100%;
+            padding: 6px;
+            margin-bottom: 10px;
+            background: #111;
+            color: #fff;
+            border: 1px solid #555;
+        }
+        #replaceDialog button {
+            background: #444;
+            color: #ddd;
+            border: none;
+            padding: 6px 12px;
+            margin-right: 8px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        #replaceDialog .close {
+            background: #444;
+            color: #fff;
+        }
+
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 2px; }
+        ::-webkit-scrollbar-track { background: #0b0f17; }
+    
+    #linksList a.selected {
+        background: #444;
+        display: block;
+    }
+    </style>
+<style id="operaUserStyle" type="text/css"></style></head>
+<body>
+<div class="app" style="grid-template-columns: 320px 1fr;">
+<header style="display: none;">
+<span class="dot green"></span>
+<strong>Console Notes</strong>
+<span class="kbd-hint">i: edit / Esc: global keys • j/k: next/prev • h/l: collapse/expand</span>
+<span class="kbd-hint">A/a: add child/after • H/L: move out/in • J/K: reorder • C/E: collapse/expand all • D: delete • r: new root • s: save</span>
+</header>
+<div id="helpDialog" style="display: none; position: fixed; top: 5%; left: 50%; transform: translateX(-50%); background: rgb(34, 34, 34); color: white; border: 2px solid rgb(153, 153, 153); padding: 20px; z-index: 9999; font-family: monospace; max-width: 820px; text-align: left; box-shadow: rgb(0, 0, 0) 0px 0px 40px;">
+<h3>Key Bindings</h3>
+<p></p>
+<table id="authorHelp" style="border-collapse: collapse; border: medium; width: 100%; display: block;">
+<tbody><tr>
+<td style="vertical-align: top; padding-right: 10px;">
+<pre>r = Add root level node
+R = Rename current Folder
+j = Select the next tree node
+k = Select the previous tree node
+, = Select the next sibling level tree node
+. = Select the previous sibling level tree node
+l = Expand the current tree node
+h = Collapse the current tree node
+u = go up a tree node level
+C = Collapse all the tree nodes
+E = Expand all the tree nodes
+A = Add child tree node
+a = Add next sibling tree node
+] = Expand the treeview panel
+[ = Shrink the treeview panel
+g = Select top tree node
+G = Select bottom tree node
+</pre>
+</td>
+<td style="vertical-align: top; padding-left: 10px;">
+<pre>H = Move current node to the parent node
+L = Make current node a child node
+J = Move current node down
+K = Move current node up
+D = Delete the current node
+i = Edit current note
+/ = Search (begin with : to search labels)
+f = Find/Replace text in the current note 
+# = Show note links dialog
+&lt; = Show the history dialog
+X = Show broken note links
+
+s = Save the current file
+S = Save as
+U = Upgrade (import existing data)
+
+V = Author Vim keys help
+! = Display options dialog
+</pre>
+</td>
+</tr>
+</tbody></table>
+<pre id="readerHelp" style="display: none;">j = Select the next tree node
+k = Select the previous tree node
+, = Select the next sibling level tree node
+. = Select the previous sibling level tree node
+l = Expand the current tree node
+h = Collapse the current tree node
+u = go up a tree node level
+C = Collapse all the tree nodes
+E = Expand all the tree nodes
+] = Expand the treeview panel
+[ = Shrink the treeview panel
+/ = Search (begin with : to search labels)
+f = Find text in the current note 
+# = Show note links dialog
+&lt; = Show the history dialog
+g = Select top tree node
+G = Select bottom tree node
+</pre>
+<p></p>
+<p style="display: none;">
+<a href="#" style="color: #fff; text-decoration: underline;" target="_blank">
+                    Full Documentation
+                </a>
+</p>
+<p>Press ESC to close.</p>
+</div>
+
+<div id="helpDialogVimEdit" style="display: none; position: fixed; top: 5%; left: 50%; transform: translateX(-50%); background: rgb(34, 34, 34); color: white; border: 2px solid rgb(153, 153, 153); padding: 20px; z-index: 9999; font-family: monospace; max-width: 820px; text-align: left; box-shadow: rgb(0, 0, 0) 0px 0px 40px;">
+<h3>Key Bindings</h3>
+<p></p>
+<pre id="authorHelpVim" style="display: block;">i = Enter insert mode, where you can write text normally
+a = Enter insert mode, where you can write text normally
+h = Move left
+l = Move right
+j = Move down
+k = Move up
+0 = Jump to the beginning of the line
+$ = Jump to the end of the line
+w = Move forward one word
+W or b = Move back one word
+x = Delete the character under the cursor
+D = Delete the current line
+gg = Go to the start of the note
+#g = Go to the specified line
+G = Go to the end of the note
+</pre>
+<pre id="readerHelpVim" style="display: none;">h = Move left
+l = Move right
+j = Move down
+k = Move up
+0 = Jump to the beginning of the line
+$ = Jump to the end of the line
+w = Move forward one word
+W or b = Move back one word
+gg = Go to the start of the note
+#g = Go to the specified line
+G = Go to the end of the note
+</pre>
+<p></p>
+<p style="display: none;">
+<a href="#" style="color: #fff; text-decoration: underline;" target="_blank">
+                    Full Documentation
+                </a>
+</p>
+<p>Press ESC to close.</p>
+</div>
+
+<div id="helpDialogVimDisabled" style="display: none; position: fixed; top: 5%; left: 50%; transform: translateX(-50%); background: rgb(34, 34, 34); color: white; border: 2px solid rgb(153, 153, 153); padding: 20px; z-index: 9999; font-family: monospace; max-width: 820px; text-align: left; box-shadow: rgb(0, 0, 0) 0px 0px 40px;">
+<h3>Key Bindings</h3>
+<p></p>
+<pre>VIM Mode is disabled. To enable it, change the mode_vim
+variable to true in this .html file.
+</pre>
+<p></p>
+<p style="display: none;">
+<a href="#" style="color: #fff; text-decoration: underline;" target="_blank">
+                    Full Documentation
+                </a>
+</p>
+<p>Press ESC to close.</p>
+</div>
+
+<div id="optionsDialog" style="display: none; position: fixed; top: 10%; left: 50%; transform: translateX(-50%); width: 400px; background: rgb(34, 34, 34); color: rgb(255, 255, 255); border: 2px solid rgb(68, 68, 68); border-radius: 2px; padding: 20px; z-index: 9999; font-family: monospace; box-shadow: rgba(0, 0, 0, 0.8) 0px 0px 20px;">
+<h3>Options</h3>
+<label><input type="checkbox" id="optShowInitHelp"> Show Init Help</label><br><br>
+<label>File Name: <input type="text" id="optFileName" style="background:#111;color:#fff;border:1px solid #555;"></label><br><br>
+<label><input type="checkbox" id="optModeVim"> Enable Vim Mode</label>
+<p>Press Enter to save, Esc to cancel.</p>
+</div>
+
+<aside class="tree" id="tree"><ul><li><div class="node selected"><span class="twisty"><svg width="6" height="6" viewBox="0 0 6 6" xmlns="http://www.w3.org/2000/svg"><circle cx="3" cy="3" r="1" fill="currentColor"></circle></svg></span><span class="icon"><!--?xml version="1.0" encoding="UTF-8" standalone="no"?--> <!-- Created with Inkscape (http://www.inkscape.org/) --> <svg width="16" height="16" viewBox="0 0 4.2333334 4.2333334" version="1.1" id="svg5" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg"> <defs id="defs2"></defs> <path style="fill:#80a5ba;fill-opacity:1;stroke-width:1.53367;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" d="m 0.79374997,0.63637699 c 1.76898013,-0.006197 0.91709523,0 2.64583343,0 V 3.5997107 H 0.79374997 Z" id="path65"></path> <path style="fill:#787878;fill-opacity:1;stroke-width:1.22694;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" d="m 1.0583332,0.93243487 c 1.4151843,-0.004957 0.7336763,0 2.116667,0 V 3.303102 h -2.116667 z" id="path4404"></path> <rect style="fill:#364750;fill-opacity:1;stroke-width:1.53367;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" id="rect5117" width="1.0583334" height="0.24694447" x="1.5875001" y="1.3772104"></rect> <rect style="fill:#364750;fill-opacity:1;stroke-width:1.53367;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" id="rect5737" width="1.0583334" height="0.24694447" x="1.5875001" y="1.8710994"></rect> <rect style="fill:#364750;fill-opacity:1;stroke-width:1.53367;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" id="rect5739" width="1.0583334" height="0.24694447" x="1.5875001" y="2.3649883"></rect> </svg></span><span class="title">Welcome to the Vummel Help System</span></div></li><li><div class="node"><span class="twisty"><svg width="6" height="6" viewBox="0 0 6 6" xmlns="http://www.w3.org/2000/svg"><circle cx="3" cy="3" r="1" fill="currentColor"></circle></svg></span><span class="icon"><!--?xml version="1.0" encoding="UTF-8" standalone="no"?--> <!-- Created with Inkscape (http://www.inkscape.org/) --> <svg width="16" height="16" viewBox="0 0 4.2333334 4.2333334" version="1.1" id="svg5" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg"> <defs id="defs2"></defs> <path style="fill:#80a5ba;fill-opacity:1;stroke-width:1.53367;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" d="m 0.79374997,0.63637699 c 1.76898013,-0.006197 0.91709523,0 2.64583343,0 V 3.5997107 H 0.79374997 Z" id="path65"></path> <path style="fill:#787878;fill-opacity:1;stroke-width:1.22694;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" d="m 1.0583332,0.93243487 c 1.4151843,-0.004957 0.7336763,0 2.116667,0 V 3.303102 h -2.116667 z" id="path4404"></path> <rect style="fill:#364750;fill-opacity:1;stroke-width:1.53367;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" id="rect5117" width="1.0583334" height="0.24694447" x="1.5875001" y="1.3772104"></rect> <rect style="fill:#364750;fill-opacity:1;stroke-width:1.53367;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" id="rect5737" width="1.0583334" height="0.24694447" x="1.5875001" y="1.8710994"></rect> <rect style="fill:#364750;fill-opacity:1;stroke-width:1.53367;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" id="rect5739" width="1.0583334" height="0.24694447" x="1.5875001" y="2.3649883"></rect> </svg></span><span class="title">Using This Help System</span></div></li><li><div class="node"><span class="twisty"><svg width="10" height="10" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><path d="M3 1 L7 5 L3 9 Z" fill="currentColor"></path></svg></span><span class="icon"><!--?xml version="1.0" encoding="UTF-8" standalone="no"?--> <svg width="16" height="16" viewBox="0 0 4.2333334 4.2333334" version="1.1" id="svg5" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg"> <defs id="defs2"></defs> <g id="g5951" transform="matrix(0.18666667,0,0,0.18666667,-0.22930552,-0.10583338)"> <g id="layer1"> <path style="fill:#80a5ba;fill-opacity:1;stroke-width:7.9375;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" d="M 2.6458333,3.96875 H 11.90625 l 2.645833,2.6458332 h 7.9375 V 19.84375 H 2.6458333 Z" id="path65"></path> <path style="fill:#466779;fill-opacity:1;stroke-width:7.9375;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" d="m 3.96875,5.2916667 h 7.408333 l 2.38125,2.38125 h 7.408334 V 18.520833 H 3.96875 Z" id="path924"></path> <rect style="fill:#364750;fill-opacity:1;stroke-width:7.9375;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" id="rect1561" width="17.197916" height="9.260417" x="3.96875" y="9.260417"></rect> </g> </g> </svg></span><span class="title">Getting Started</span></div></li><li><div class="node"><span class="twisty"><svg width="10" height="10" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><path d="M3 1 L7 5 L3 9 Z" fill="currentColor"></path></svg></span><span class="icon"><!--?xml version="1.0" encoding="UTF-8" standalone="no"?--> <svg width="16" height="16" viewBox="0 0 4.2333334 4.2333334" version="1.1" id="svg5" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg"> <defs id="defs2"></defs> <g id="g5951" transform="matrix(0.18666667,0,0,0.18666667,-0.22930552,-0.10583338)"> <g id="layer1"> <path style="fill:#80a5ba;fill-opacity:1;stroke-width:7.9375;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" d="M 2.6458333,3.96875 H 11.90625 l 2.645833,2.6458332 h 7.9375 V 19.84375 H 2.6458333 Z" id="path65"></path> <path style="fill:#466779;fill-opacity:1;stroke-width:7.9375;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" d="m 3.96875,5.2916667 h 7.408333 l 2.38125,2.38125 h 7.408334 V 18.520833 H 3.96875 Z" id="path924"></path> <rect style="fill:#364750;fill-opacity:1;stroke-width:7.9375;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" id="rect1561" width="17.197916" height="9.260417" x="3.96875" y="9.260417"></rect> </g> </g> </svg></span><span class="title">Key Bindings</span></div></li><li><div class="node"><span class="twisty"><svg width="6" height="6" viewBox="0 0 6 6" xmlns="http://www.w3.org/2000/svg"><circle cx="3" cy="3" r="1" fill="currentColor"></circle></svg></span><span class="icon"><!--?xml version="1.0" encoding="UTF-8" standalone="no"?--> <svg width="16" height="16" viewBox="0 0 4.2333334 4.2333334" version="1.1" id="svg5" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg"> <defs id="defs2"></defs> <g id="g5951" transform="matrix(0.18666667,0,0,0.18666667,-0.22930552,-0.10583338)"> <g id="layer1"> <path style="fill:#80a5ba;fill-opacity:1;stroke-width:7.9375;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" d="M 2.6458333,3.96875 H 11.90625 l 2.645833,2.6458332 h 7.9375 V 19.84375 H 2.6458333 Z" id="path65"></path> <path style="fill:#466779;fill-opacity:1;stroke-width:7.9375;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" d="m 3.96875,5.2916667 h 7.408333 l 2.38125,2.38125 h 7.408334 V 18.520833 H 3.96875 Z" id="path924"></path> <rect style="fill:#364750;fill-opacity:1;stroke-width:7.9375;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" id="rect1561" width="17.197916" height="9.260417" x="3.96875" y="9.260417"></rect> </g> </g> </svg></span><span class="title">Saving</span></div></li></ul></aside>
+<section class="editor">
+<div class="status">
+<span class="pill" id="mode" style="display: block;">TREE</span>
+<span class="pill" id="kind">FILE</span>
+<span class="dim" id="path">/Welcome to the Vummel Help System</span>
+</div>
+<textarea id="editorArea" spellcheck="false" readonly="readonly"></textarea>
+</section>
+</div>
+<div class="search-dialog" id="searchDialog" style="display: none;">
+<input id="searchInput" placeholder="Search..." type="text">
+<div class="search-results" id="searchList"><div>Introduction to Navigation</div><div>Navigating Forward and Backward</div><div class="selected">History</div></div>
+</div>
+<div id="linksDialog" style="display: none;">
+<h3>Links in Note</h3>
+<div id="linksList"><p>No missing links found</p></div>
+</div>
+<div id="replaceDialog" style="display: none;">
+<h3>Find &amp; Replace</h3>
+<label for="searchText">Find</label>
+<input id="searchText" type="text">
+<div id="replaceTools" style="display: block;">
+<label for="replaceText">Replace With</label>
+<input id="replaceText" type="text">
+<div style="display: none;">
+<button onclick="doFind()">Find</button>
+<button onclick="doReplaceAll()">Replace All</button>
+</div>
+</div>
+<div id="replaceResults">Replaced 1 occurrence(s).</div>
+</div>
+
+<div id="historyDialog" style="display: none; position: fixed; top: 10%; left: 50%; transform: translateX(-50%); width: 600px; max-height: 70%; background: rgb(34, 34, 34); color: rgb(255, 255, 255); border: 2px solid rgb(68, 68, 68); border-radius: 2px; padding: 20px; z-index: 9999; font-family: monospace; overflow-y: auto; box-shadow: rgba(0, 0, 0, 0.8) 0px 0px 20px;">
+  <h3>History</h3>
+  <div id="historyList"><div>Starting a Connection</div><div class="selected" style="background: rgb(68, 68, 68);">Completing the Connection</div><div>Introduction to Connections</div><div>Link Nodes</div><div>Renaming a Node</div><div>Duplicating the Selected Node</div><div>Adding Nodes</div><div>What is Vummel?</div><div>Welcome to the Vummel Help System</div><div>Using This Help System</div></div>
+</div>
+<input type="file" id="filePicker" accept=".html" style="display:none;">
+
+<script>
+        //---- Data Model ------------------------------------------------------
+        const makeId = () => Math.random().toString(36).slice(2, 10);
+
+        /** @typedef {{ id:string, title:string, content:string, children:NodeT[], expanded:boolean }} NodeT */
+
+        /** @type {NodeT[]} */
+        let treeData = [
+  {"id":"6ljuj3h0","title":"Welcome to the Vummel Help System","content":"Welcome to the Vummel Help System\n--------------------------------------------------------------------------------\n\nUse the\n#\nkey to display the links dialog.\n\nBelow are some topics that can get\nyou started:\n\n_Using This Help System_\n_What is Vummel?_\n_Key Bindings_","children":[],"expanded":false},{"id":"jyyq2oq0","title":"Using This Help System","content":"Using This Help System\n--------------------------------------------------------------------------------\n\nThis is a keyboard-driven help system. To see a quick guide of its key mappings\nuse:\n\n?\n\n** Note **\nYou CAN use your mouse to expand and collapse the tree nodes, as well as\nselecting the topics you would like to read.","children":[],"expanded":false},{"id":"nk7hvnx1","title":"Getting Started","content":"","children":[{"id":"erv01jrx","title":"What is Vummel?","content":"What is Vummel?\n--------------------------------------------------------------------------------\n\nVummel is a keyboard-driven UML diagram application.\nIt allows you to create complex diagrams without ever leaving your keyboard!\n\nIf you are new to Vummel there are two challenges that you will need to learn:\n* The key bindings : _Key Bindings_\n* Saving and managing your files : _Saving_","children":[],"expanded":false}],"expanded":false},{"id":"pw96sogo","title":"Key Bindings","content":"","children":[{"id":"zzfwk2b4","title":"Adding Nodes","content":"Adding Nodes\n--------------------------------------------------------------------------------\n\nYou can add a new node to your diagram by hitting the following key:\n\na","children":[],"expanded":false},{"id":"p3jo7vh1","title":"Duplicating the Selected Node","content":"Duplicating the Selected Node\n--------------------------------------------------------------------------------\n\nIf you wish to duplicate the curently selected node you can use the following\nkey:\n\n=","children":[],"expanded":false},{"id":"igdxij3u","title":"Renaming a Node","content":"Renaming a Node\n--------------------------------------------------------------------------------\n\nTo rename a node (change its type) you can use the following key:\n\nr","children":[],"expanded":false},{"id":"8dw9v1cq","title":"Link Nodes","content":"Link Nodes\n--------------------------------------------------------------------------------\n\nYou can create a node that is simply a link to a URL. To do this you will use\nthe following key:\n\nu","children":[],"expanded":false},{"id":"qio87n34","title":"Creating Connections","content":"","children":[{"id":"miszlvgi","title":"Introduction to Connections","content":"Introduction to Connections\n--------------------------------------------------------------------------------\n\nYou can connect nodes by first intializing the connection mode, then selecting\nthe target node and making the connection.","children":[],"expanded":false},{"id":"rw06jxmk","title":"Starting a Connection","content":"Starting a Connection\n--------------------------------------------------------------------------------\n\nTo begin making a connection you can select the source node, then use the key:\n\nc","children":[],"expanded":false},{"id":"ryzc9bvi","title":"Completing the Connection","content":"Completing the Connection\n--------------------------------------------------------------------------------\n\nIf you have begun a connection (see: _Starting a Connection_) you can then\nnavigate to the target node (see _Navigating Nodes_), then to complete the\nconnection you can use one of the following:\n\nEnter\n  This will create a plain line as the connection between the two nodes.\n\n>\n  This will create a line with an arrow pointing to the target node.","children":[],"expanded":false}],"expanded":false},{"id":"atqii6xw","title":"Disconnecting Nodes","content":"Disconnecting Nodes\n--------------------------------------------------------------------------------\n\nIf you have connected two nodes that you need to now disconnect, you can select\nthe first node and hit:\n\nX\n\nThen navigate to the node you want to disconnect from and hit:\n\nEnter","children":[],"expanded":false},{"id":"gbg3qbn5","title":"Deleting Nodes","content":"Deleting Nodes\n--------------------------------------------------------------------------------\n\nIf you have created a node that you later need to delete, you can select\nit and use the following key:\n\nD","children":[],"expanded":false},{"id":"nyl91mei","title":"Editing a Node's Text","content":"Editing a Node's Text\n--------------------------------------------------------------------------------\n\nEvery node has two sections to it: The text area, and the child nodes area.\nTo edit a node's text, you can select it then hit the following key:\n\ni","children":[],"expanded":false},{"id":"zt597g6u","title":"Repeating Actions","content":"Repeating Actions\n--------------------------------------------------------------------------------\n\nWhen moving nodes or resizing nodes, you can do this multiple times by first\nentering a number followed by its key-code.","children":[],"expanded":false},{"id":"u4unbqdy","title":"Navigating Nodes","content":"","children":[{"id":"nbofydam","title":"Introduction to Navigation","content":"Introduction to Navigation\n--------------------------------------------------------------------------------\n\nThere are a number of ways that you can navigate through your Vummel diagram.\n\nIt is important to be familiar with all of them - especially if your diagrams\nare large (full of many nodes). For instance, if you are just looking to\nselect a specific node you could use the search tool, or you could use _Marks_\nto select commonly accessed nodes.\n\nIf you are performing multi-step actions such as linking nodes, unlinking nodes,\nsnapping nodes etc - you can use either the search feature, the marks feature,\nOR the history feature to make your life easier.","children":[],"expanded":false},{"id":"ttl2v5ej","title":"Navigating Forward and Backward","content":"Navigating Forward and Backward\n--------------------------------------------------------------------------------\n\nYou can move forward and backward through your nodes using the following keys:\n\nw = Forward through your nodes (in the order they were created).\nW = Backward through your nodes.\n\n** Note **\nWith larger diagrams this becomes less useful.\nFor large diagrams you can use:\n* _Searching Nodes_\n* _Marks_\n* _History_","children":[],"expanded":false},{"id":"1fxv0pdk","title":"Searching Nodes","content":"Searching Nodes\n--------------------------------------------------------------------------------\n\nYou can search through your nodes and select the one you want to go to using\nthe following key:\n\n/\n\nEnter the search string and use the up and down arrow keys to highlight\nthe node you want, then hit Enter. Or you can hit the Escape key to simply close\nthe dialog.","children":[],"expanded":false},{"id":"by2qyo8l","title":"Marks","content":"Marks\n--------------------------------------------------------------------------------\n\nFor nodes that you need to access often, you can bookmark those nodes.\nThis feature is similar to Vim's Marks. To set a mark use the following key:\n\nm\n\nThen enter a lower OR upper case letter. This letter will be how you\naccess the mark later. To access marks use the following key:\n\n`\n\nThen enter the mark's lower or upper case identifying letter.","children":[],"expanded":false},{"id":"twqd74tk","title":"History","content":"History\n--------------------------------------------------------------------------------\n\nAnother way to navigate among your diagram's nodes is by using the history\nfeature. Every time you select a node, it is added to the history list. To\nview this list and select nodes from within it, use the following key:\n\n'","children":[],"expanded":false}],"expanded":false}],"expanded":false},{"id":"kiypm5vn","title":"Saving","content":"","children":[],"expanded":false}
+];
+
+        // !@!
+        const readOnly = true;
+
+
+
+        const SAFE_MAP = {
+            "</script": "^^^script^^^",
+            "</style": "^^^style^^^",
+            "]]>": "^^^cdata^^^",
+            "];": "^^^array^^^",
+            "\\);": "^^^func^^^"
+        };
+
+        let historyStack = [];
+        let showingHistory = false;
+        let historyIndex = 0;
+
+        let fileName = "vummel_help";
+        let showInitHelp = false;
+        let selectedId = null;
+        let editing = false;
+        let showingLinks = false;
+        let finding = false;
+        let mode_vim = true;
+        let mode_insert = false;
+        let mode_repeat = 1;
+        let mode_counting = false;
+        let mode_going = false;
+        let mode_deleting = false;
+
+        let searchActive = false;
+        let searchMatches = [];
+        let searchIndex = 0;
+        const helpDialog = document.getElementById('helpDialog');
+        const helpDialogVimEdit = document.getElementById('helpDialogVimEdit');
+        const helpDialogVimDisabled = document.getElementById('helpDialogVimDisabled');
+        const optionsDialog = document.getElementById('optionsDialog');
+        const searchDialog = document.getElementById('searchDialog');
+        const replaceDialog = document.getElementById('replaceDialog');
+        const searchInput = document.getElementById('searchInput');
+        const searchList = document.getElementById('searchList');
+        const optShowInitHelp = document.getElementById('optShowInitHelp');
+        const optFileName = document.getElementById('optFileName');
+        const optModeVim = document.getElementById('optModeVim');
+        let optionFields = [optShowInitHelp, optFileName, optModeVim];
+        let optionIndex = 0;
+
+        let findMatches = [];
+        let findIndex = 0;
+
+
+        //---- Utilities -------------------------------------------------------
+        function generateId() {
+            return Math.random().toString(36).substr(2, 9);
+        }
+        function findNode(id) {
+            for (const n of treeData) {
+                if (n.id === id) return n;
+            }
+        }
+        function findNodeAndParentById(id, nodes = treeData, parent = null) {
+            for (const n of nodes) {
+                if (n.id === id) return { node: n, parent };
+                const res = findNodeAndParentById(id, n.children, n);
+                if (res) return res;
+            }
+            return null;
+        }
+        function getSiblingsAndIndex(id) {
+            const info = findNodeAndParentById(id);
+            if (!info) return null;
+            const siblings = info.parent ? info.parent.children : treeData;
+            const index = siblings.findIndex(n => n.id === id);
+            return { siblings, index, parent: info.parent };
+        }
+        function isFolder(n){ return (n.content || "").trim().length === 0; }
+        function updateTitleFromContent(n){
+            const firstLine = (n.content||"").split(/\r?\n/)[0].trim();
+            if (firstLine) n.title = firstLine.slice(0, 80);
+            else if (!n.title || !n.title.startsWith("New")) n.title = "New Folder";
+        }
+        function computePath(id){
+            const segments = [];
+            (function walk(id){
+                const info = findNodeAndParentById(id);
+                if (!info) return;
+                if (info.parent) walk(info.parent.id);
+                segments.push(info.node.title || "Untitled");
+            })(id);
+            return '/' + segments.join('/');
+        }
+
+        function recordHistory(id) {
+            const node = findNodeAndParentById(id)?.node;
+            if (!node) return;
+            if (isFolder(node)) return; // only record notes
+        
+            // Remove any existing entry for this id
+            historyStack = historyStack.filter(entry => entry.id !== id);
+        
+            // Add it at the end (latest)
+            historyStack.push({ id, title: node.title || "(untitled)" });
+        
+            // Cap size at 100
+            if (historyStack.length > 100) {
+                historyStack.shift();
+            }
+        }
+
+
+        //---- Rendering -------------------------------------------------------
+        const treeEl = document.getElementById('tree');
+        const editorArea = document.getElementById('editorArea');
+        const modeEl = document.getElementById('mode');
+        const kindEl = document.getElementById('kind');
+        const pathEl = document.getElementById('path');
+
+        function render(){
+            // Render tree
+            treeEl.innerHTML = '';
+            const ul = document.createElement('ul');
+            treeEl.appendChild(ul);
+
+            function renderNode(n){
+                const li = document.createElement('li');
+                const row = document.createElement('div');
+                row.className = 'node' + (n.id === selectedId ? ' selected' : '');
+
+                // Twisty indicator
+                const twist = document.createElement('span');
+                twist.className = 'twisty';
+                if (n.children.length) {
+                    twist.innerHTML = n.expanded
+                    ? `<svg width="10" height="10" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><path d="M1 3 L5 7 L9 3 Z" fill="currentColor" /></svg>`
+                    : `<svg width="10" height="10" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><path d="M3 1 L7 5 L3 9 Z" fill="currentColor" /></svg>`;
+                } else {
+                    twist.innerHTML = `<svg width="6" height="6" viewBox="0 0 6 6" xmlns="http://www.w3.org/2000/svg"><circle cx="3" cy="3" r="1" fill="currentColor" /></svg>`;
+                }
+
+                // Icon
+                const icon = document.createElement('span');
+                icon.className = 'icon';
+                icon.innerHTML = isFolder(n)
+                    ? `<?xml version="1.0" encoding="UTF-8" standalone="no"?> <svg width="16" height="16" viewBox="0 0 4.2333334 4.2333334" version="1.1" id="svg5" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg"> <defs id="defs2" /> <g id="g5951" transform="matrix(0.18666667,0,0,0.18666667,-0.22930552,-0.10583338)"> <g id="layer1"> <path style="fill:#80a5ba;fill-opacity:1;stroke-width:7.9375;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" d="M 2.6458333,3.96875 H 11.90625 l 2.645833,2.6458332 h 7.9375 V 19.84375 H 2.6458333 Z" id="path65" /> <path style="fill:#466779;fill-opacity:1;stroke-width:7.9375;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" d="m 3.96875,5.2916667 h 7.408333 l 2.38125,2.38125 h 7.408334 V 18.520833 H 3.96875 Z" id="path924" /> <rect style="fill:#364750;fill-opacity:1;stroke-width:7.9375;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" id="rect1561" width="17.197916" height="9.260417" x="3.96875" y="9.260417" /> </g> </g> </svg>`
+                    : `<?xml version="1.0" encoding="UTF-8" standalone="no"?> <!-- Created with Inkscape (http://www.inkscape.org/) --> <svg width="16" height="16" viewBox="0 0 4.2333334 4.2333334" version="1.1" id="svg5" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg"> <defs id="defs2" /> <path style="fill:#80a5ba;fill-opacity:1;stroke-width:1.53367;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" d="m 0.79374997,0.63637699 c 1.76898013,-0.006197 0.91709523,0 2.64583343,0 V 3.5997107 H 0.79374997 Z" id="path65" /> <path style="fill:#787878;fill-opacity:1;stroke-width:1.22694;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" d="m 1.0583332,0.93243487 c 1.4151843,-0.004957 0.7336763,0 2.116667,0 V 3.303102 h -2.116667 z" id="path4404" /> <rect style="fill:#364750;fill-opacity:1;stroke-width:1.53367;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" id="rect5117" width="1.0583334" height="0.24694447" x="1.5875001" y="1.3772104" /> <rect style="fill:#364750;fill-opacity:1;stroke-width:1.53367;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" id="rect5737" width="1.0583334" height="0.24694447" x="1.5875001" y="1.8710994" /> <rect style="fill:#364750;fill-opacity:1;stroke-width:1.53367;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers" id="rect5739" width="1.0583334" height="0.24694447" x="1.5875001" y="2.3649883" /> </svg>`;
+
+                const title = document.createElement('span');
+                title.className = 'title';
+                title.textContent = n.title || '(untitled)';
+
+                row.addEventListener('click', () => {
+                    selectedId = n.id;
+                    if (n.children.length) {
+                        n.expanded = !n.expanded; // toggle when clicking row
+                    }
+                    render();
+                });
+
+                row.appendChild(twist); row.appendChild(icon); row.appendChild(title);
+                row.addEventListener('click', () => { selectedId = n.id; render(); });
+
+                li.appendChild(row);
+
+                if (n.expanded && n.children.length){
+                    const inner = document.createElement('ul');
+                    for (const c of n.children) inner.appendChild(renderNode(c));
+                    li.appendChild(inner);
+                }
+                return li;
+            }
+
+            for (const n of treeData) ul.appendChild(renderNode(n));
+
+            // Render editor status + content
+            const selInfo = findNodeAndParentById(selectedId);
+            if (selInfo){
+                pathEl.textContent = computePath(selInfo.node.id);
+                kindEl.textContent = isFolder(selInfo.node) ? 'FOLDER' : 'FILE';
+                if (!editing) {
+                    editorArea.value = safeRestoreText(selInfo.node.content) || '';
+                    editorArea.setAttribute('readonly', 'readonly');
+                } else {
+                    editorArea.removeAttribute('readonly');
+                    // keep as-is while editing
+                }
+            } else {
+                pathEl.textContent = '/';
+                kindEl.textContent = '—';
+                editorArea.value = '';
+                editorArea.setAttribute('readonly', 'readonly');
+            }
+
+            modeEl.textContent = editing ? modeEl.textContent : 'TREE';
+
+            if (selectedId) recordHistory(selectedId);
+
+            // Ensure selected node is visible
+            setTimeout(() => {
+                const selEl = document.querySelector('.node.selected');
+                if (selEl) selEl.scrollIntoView({ block: "nearest" });
+            }, 0);
+        }
+
+
+        //---- Editor Sync -----------------------------------------------------
+        editorArea.addEventListener('input', () => {
+            syncFile();
+        });
+
+        function syncFile() {
+            const info = findNodeAndParentById(selectedId);
+            if (!info) return;
+            info.node.content = safeStoreText(editorArea.value);
+            updateTitleFromContent(info.node);
+            // File vs folder might have changed; keep UI responsive
+            render();
+        }
+
+        function safeStoreText(text) {
+            if (!text) return "";
+            for (const [raw, safe] of Object.entries(SAFE_MAP)) {
+              text = text.replace(new RegExp(raw, "gi"), safe);
+            }
+            return text;
+        }
+
+        function safeRestoreText(text) {
+            if (!text) return "";
+            for (const [raw, safe] of Object.entries(SAFE_MAP)) {
+                // escape special chars in safe before making regex
+                const esc = safe.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                text = text.replace(new RegExp(esc, "gi"), raw);
+            }
+            return text;
+        }
+
+        editorArea.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+
+                if (mode_insert && mode_vim) {
+                    setVimMode(false);
+                    editorArea.setSelectionRange(editorArea.selectionStart,editorArea.selectionStart);
+                } else {
+                    editing = false;
+                    editorArea.blur();
+                    render();
+                }
+
+                return;
+            }
+
+            vimKeys(e);
+        });
+
+
+
+        // ---- VIM Keys -------------------------------------------------------
+        function vimKeys(e) {
+            // Insert mode logic
+            if (mode_insert) {
+                if (e.key === "Tab") {
+                    // Expand tab into 4 spaces
+                    e.preventDefault();
+                    const start = editorArea.selectionStart;
+                    const end = editorArea.selectionEnd;
+        
+                    editorArea.setRangeText("    ", start, end, "end");
+                }
+                return; // In insert mode, otherwise let typing behave normally
+            }
+
+            if (mode_insert) {
+                return;
+            }
+
+            e.preventDefault();
+        
+            // Normal mode logic
+            if (!isNaN(parseInt(e.key, 10))) {
+                const digit = parseInt(e.key, 10);
+                if (!mode_counting) {
+                    if (digit !== 0) {
+                        mode_repeat = digit;
+                        mode_counting = true;
+                        return;
+                    }
+                } else {
+                    mode_repeat = (mode_repeat * 10) + digit;
+                    return;
+                }
+            }
+
+
+            // Cancel any multi-key flags
+            if (e.key !== 'g') {
+                mode_going = false;
+            }
+            if (e.key !== 'd') {
+                mode_deleting = false;
+            }
+            if (mode_counting && isNaN(parseInt(e.key, 10))) {
+                mode_counting = false;
+            }
+
+        
+            // Execute commands with repeat count
+            const count = mode_repeat;
+            let performed = false;
+        
+            switch (e.key) {
+                case "i": // Enter insert mode
+                case "a":
+                    setVimMode(true);
+                    mode_insert = true;
+                    performed = true;
+                    modeEl.textContent = 'INSERT';
+                    break;
+        
+                case "h": // Move left
+                    editorArea.selectionStart = Math.max(0, editorArea.selectionStart - count);
+                    editorArea.selectionEnd = editorArea.selectionStart;
+                    performed = true;
+                    break;
+        
+                case "l": // Move right
+                    editorArea.selectionStart = Math.min(editorArea.value.length, editorArea.selectionStart + count);
+                    editorArea.selectionEnd = editorArea.selectionStart;
+                    performed = true;
+                    break;
+        
+                case "j": // Move down lines
+                    for (let i = 0; i < count; i++) moveCursorVertical(1);
+                    performed = true;
+                    break;
+        
+                case "k": // Move up lines
+                    for (let i = 0; i < count; i++) moveCursorVertical(-1);
+                    performed = true;
+                    break;
+        
+                case "0": // Jump to beginning of line
+                    const before0 = editorArea.value.lastIndexOf("\n", editorArea.selectionStart - 1);
+                    editorArea.selectionStart = editorArea.selectionEnd = (before0 === -1 ? 0 : before0 + 1);
+                    performed = true;
+                    break;
+        
+                case "$": // Jump to end of line
+                    const after$ = editorArea.value.indexOf("\n", editorArea.selectionStart);
+                    editorArea.selectionStart = editorArea.selectionEnd = (after$ === -1 ? editorArea.value.length : after$);
+                    performed = true;
+                    break;
+
+                case "w": // Forward word(s)
+                    for (let i = 0; i < count; i++) moveWord(1);
+                    performed = true;
+                    break;
+
+                case "W": // Backward word(s)
+                case "b": // Backward word(s)
+                    for (let i = 0; i < count; i++) moveWord(-1);
+                    performed = true;
+                    break;
+        
+                case "x": // Delete character(s) under cursor
+                    const start = editorArea.selectionStart;
+                    if (start < editorArea.value.length) {
+                        editorArea.setRangeText("", start, start + count, "end");
+                    }
+                    performed = true;
+                    break;
+
+                case "g": // Possible gg
+                    if (mode_going) {
+                        if (count > 1) {
+                            // Go to line N
+                            const lines = editorArea.value.split("\n");
+                            const lineIndex = Math.min(count - 1, lines.length - 1);
+                            let pos = 0;
+                            for (let i = 0; i < lineIndex; i++) {
+                                pos += lines[i].length + 1;
+                            }
+                            performed = true;
+                            editorArea.selectionStart = editorArea.selectionEnd = pos;
+                        } else {
+                            editorArea.selectionStart = editorArea.selectionEnd = 0;
+                            performed = true;
+                        }
+
+                        scrollToCursor();
+                    } else {
+                        mode_going = true;
+                    }
+                    break;
+
+                case "D": // Delete to end of line(s)
+                    const text = editorArea.value;
+                    let startDelEnd = editorArea.selectionStart;
+                    let end = text.indexOf("\n", startDelEnd);
+            
+                    if (end === -1) end = text.length;
+            
+                    editorArea.setSelectionRange(startDelEnd, end);
+                    editorArea.setRangeText("", startDelEnd, end, "start");
+                    editorArea.selectionStart = editorArea.selectionEnd = startDelEnd;
+                    e.preventDefault();
+                    syncFile();
+                    performed = true;
+                    break;
+
+                case "d": // Possible dd
+                    if (mode_deleting) {
+                        const text = editorArea.value;
+                        const pos = editorArea.selectionStart;
+                
+                        // Find start of current line
+                        const lineStart = text.lastIndexOf("\n", pos - 1) + 1;
+                
+                        // Find end of current line INCLUDING newline
+                        let lineEnd = text.indexOf("\n", pos);
+                        if (lineEnd === -1) {
+                            // last line → delete through end of buffer
+                            lineEnd = text.length;
+                        } else {
+                            // include the newline itself
+                            lineEnd += 1;
+                        }
+                
+                        // Repeat delete for count > 1
+                        for (let i = 1; i < count; i++) {
+                            const nextEnd = text.indexOf("\n", lineEnd);
+                            if (nextEnd === -1) {
+                                lineEnd = text.length;
+                                break;
+                            } else {
+                                lineEnd = nextEnd + 1;
+                            }
+                        }
+                
+                        editorArea.setRangeText("", lineStart, lineEnd, "start");
+                
+                        // Place cursor at start of deleted line
+                        editorArea.selectionStart = editorArea.selectionEnd = lineStart;
+                        syncFile();
+                
+                        performed = true;
+                    } else {
+                        mode_deleting = true;
+                    }
+                    break;
+
+                case "G": // End of buffer, or Nth line
+                    editorArea.selectionStart = editorArea.selectionEnd = editorArea.value.length;
+                    performed = true;
+                    scrollToCursor();
+                    break;
+            }
+        
+            // Reset repeat count after command
+            if (performed) {
+                mode_repeat = 1;
+                mode_counting = false;
+                mode_going = false;
+                mode_deleting = false;
+            }
+        
+            // --- Helper for j/k ---
+            function moveCursorVertical(direction) {
+                const text = editorArea.value;
+                const pos = editorArea.selectionStart;
+        
+                // Find current line start/end
+                const lineStart = text.lastIndexOf("\n", pos - 1) + 1;
+                const lineEnd = text.indexOf("\n", pos);
+                const currentCol = pos - lineStart;
+        
+                // Target line
+                let targetLineStart, targetLineEnd;
+                if (direction > 0) { // down
+                    if (lineEnd === -1) return; // already last line
+                    targetLineStart = lineEnd + 1;
+                    targetLineEnd = text.indexOf("\n", targetLineStart);
+                    if (targetLineEnd === -1) targetLineEnd = text.length;
+                } else { // up
+                    if (lineStart === 0) return; // already first line
+                    targetLineEnd = lineStart - 1;
+                    targetLineStart = text.lastIndexOf("\n", targetLineEnd - 1) + 1;
+                }
+        
+                // Keep column if possible, else move to end of line
+                const targetPos = Math.min(targetLineStart + currentCol, targetLineEnd);
+                editorArea.selectionStart = editorArea.selectionEnd = targetPos;
+            }
+
+            function moveWord(direction) {
+                const text = editorArea.value;
+                let pos = editorArea.selectionStart;
+
+                if (direction > 0) {
+                    // Skip current non-word chars
+                    while (pos < text.length && /\W/.test(text[pos])) pos++;
+                    // Skip word chars
+                    while (pos < text.length && /\w/.test(text[pos])) pos++;
+                } else {
+                    // Move left past non-word chars
+                    while (pos > 0 && /\W/.test(text[pos - 1])) pos--;
+                    // Move left past word chars
+                    while (pos > 0 && /\w/.test(text[pos - 1])) pos--;
+                }
+
+                editorArea.selectionStart = editorArea.selectionEnd = pos;
+            }
+        }
+        // ---------------------------------------------------------------------
+
+
+
+        //---- Commands --------------------------------------------------------
+        function ensureSelection(){ if (!selectedId && treeData[0]) selectedId = treeData[0].id; }
+
+        function setVimMode(insertMode) {
+            if (insertMode) {
+                mode_insert = true;
+                modeEl.textContent = 'INSERT';
+            } else {
+                mode_insert = false;
+                modeEl.textContent = 'NORMAL';
+            }
+        }
+
+        function scrollToCursor() {
+            const pos = editorArea.selectionStart;
+            const textBefore = editorArea.value.slice(0, pos);
+            const lineIndex = textBefore.split("\n").length - 1;
+            const lineHeight = 16; // adjust if your textarea font-size/line-height differs
+        
+            editorArea.scrollTop = lineIndex * lineHeight;
+        }
+
+        function addRoot(){
+            const node = { id: makeId(), title: 'New Folder', content: '', children: [], expanded: true };
+            treeData.push(node);
+            selectedId = node.id;
+        }
+        function addAfter(){
+            if (!treeData || treeData.length === 0) return;
+            ensureSelection();
+            const ctx = getSiblingsAndIndex(selectedId);
+            if (!ctx) return;
+            const node = { id: makeId(), title: 'New Folder', content: '', children: [], expanded: true };
+            ctx.siblings.splice(ctx.index + 1, 0, node);
+            selectedId = node.id;
+        }
+        function addChild(){
+            if (!treeData || treeData.length === 0) return;
+            ensureSelection();
+            const info = findNodeAndParentById(selectedId);
+            if (!info) return;
+            info.node.expanded = true;
+            const node = { id: makeId(), title: 'New Folder', content: '', children: [], expanded: true };
+            info.node.children.push(node);
+            selectedId = node.id;
+        }
+        function renameFolder() {
+            if (!treeData || treeData.length === 0) return;
+            ensureSelection();
+            let selectedNode = findNodeAndParentById(selectedId).node;
+            if (isFolder(selectedNode)) {
+                let newName = prompt('Enter new folder name:', selectedNode.name);
+                if (!newName) { return; }
+                selectedNode.title = newName;
+                render();
+            }
+        }
+        function selectNextSibling(curLevelOnly) {
+            const info = findNodeAndParentById(selectedId);
+            if (!info) return;
+        
+            // Case 1: current is a folder with children
+            if (!curLevelOnly) {
+                if (isFolder(info.node) && info.node.children.length) {
+                    if (!info.node.expanded) {
+                        info.node.expanded = true; // expand if collapsed
+                    }
+                    selectedId = info.node.children[0].id;
+                    return;
+                }
+            }
+        
+            // Case 2: move to next sibling at this level
+            const ctx = getSiblingsAndIndex(selectedId);
+            if (!ctx) return;
+            if (ctx.index < ctx.siblings.length - 1) {
+                selectedId = ctx.siblings[ctx.index + 1].id;
+                return;
+            }
+        
+            // Case 3: last sibling → climb ancestors until one has a next sibling
+            if (!curLevelOnly) {
+                let ancestorId = ctx.parent ? ctx.parent.id : null;
+                while (ancestorId) {
+                    const actx = getSiblingsAndIndex(ancestorId);
+                    if (!actx) break;
+            
+                    if (actx.index < actx.siblings.length - 1) {
+                        selectedId = actx.siblings[actx.index + 1].id;
+                        return;
+                    }
+            
+                    // go up another level
+                    ancestorId = actx.parent ? actx.parent.id : null;
+                }
+            }
+        }
+        function selectPrevSibling(curLevelOnly) {
+            const ctx = getSiblingsAndIndex(selectedId);
+            if (!ctx) return;
+        
+            // If we are the first child, go to parent instead
+            if (!curLevelOnly) {
+                if (ctx.index === 0 && ctx.parent) {
+                    selectedId = ctx.parent.id;
+                    return;
+                }
+            }
+        
+            // Otherwise go to previous sibling
+            const prev = Math.max(ctx.index - 1, 0);
+            selectedId = ctx.siblings[prev].id;
+        }
+        function moveRight(){
+            const info = findNodeAndParentById(selectedId); if (!info) return;
+            if (info.node.children.length && !info.node.expanded) {
+                info.node.expanded = true;
+            } else if (info.node.children.length) {
+                selectedId = info.node.children[0].id;
+            }
+        }
+        function moveLeft(doCollapse){
+            const info = findNodeAndParentById(selectedId); if (!info) return;
+            if (info.node.expanded && doCollapse) {
+                info.node.expanded = false;
+            } else {
+                if (info.parent) selectedId = info.parent.id;
+            }
+        }
+        function collapseAll(){
+            (function walk(list){
+                for (const n of list){ n.expanded = false; walk(n.children); }
+            })(treeData);
+            selectedId = treeData[0].id;
+        }
+        function expandAll(){
+            (function walk(list){
+                for (const n of list){ n.expanded = true; walk(n.children); }
+            })(treeData);
+        }
+        function gotoTop(){
+            selectedId = treeData[0].id;
+            treeEl.scrollTo(0, 0, "smooth");
+        }
+        function gotoBottom(){
+            selectedId = treeData[treeData.length-1].id;
+            treeEl.scrollTo(0, treeEl.scrollHeight, "smooth");
+        }
+        function moveOutToParent(){
+            const ctx = getSiblingsAndIndex(selectedId); if (!ctx || !ctx.parent) return; // already root
+            // Remove from current siblings
+            const [node] = ctx.siblings.splice(ctx.index, 1);
+            // Insert after parent in its own siblings list
+            const pctx = getSiblingsAndIndex(ctx.parent.id);
+            const insertAt = pctx.index + 1;
+            pctx.siblings.splice(insertAt, 0, node);
+            selectedId = node.id;
+        }
+        function moveIntoAsChild(){
+            const info = findNodeAndParentById(selectedId); if (!info) return;
+            // Move selected under some other selected? Spec: 'L' moves the current node into the currently selected node, as a child.
+            // Since there's only one selection, interpret as: move the node into its next sibling if any; else do nothing.
+            // Better: if the node has a previous sibling, move it into that sibling (common Vim tree behavior with L)?
+            // But spec says: into the currently selected node — that's the node itself; so allow moving the PREVIOUS sibling into CURRENT with hotkey on that previous sibling would be impossible.
+            // We'll interpret L as: if there is a previous sibling, move this node into that previous sibling as a child; otherwise if current has a next sibling, move into that. If neither, no-op.
+
+            const ctx = getSiblingsAndIndex(selectedId); if (!ctx) return;
+            const target = ctx.siblings[ctx.index - 1] || ctx.siblings[ctx.index + 1];
+            if (!target) return;
+            if (!Array.isArray(target.children)) target.children = [];
+            target.expanded = true;
+            const [node] = ctx.siblings.splice(ctx.index, 1);
+            target.children.push(node);
+            selectedId = node.id;
+        }
+        function reorderAmongSiblings(dir){
+            const ctx = getSiblingsAndIndex(selectedId); if (!ctx) return;
+            const newIndex = ctx.index + (dir === 'down' ? 1 : -1);
+            if (newIndex < 0 || newIndex >= ctx.siblings.length) return;
+            const [node] = ctx.siblings.splice(ctx.index, 1);
+            ctx.siblings.splice(newIndex, 0, node);
+            selectedId = node.id;
+        }
+        function deleteNode(){
+            const ctx = getSiblingsAndIndex(selectedId); if (!ctx) return;
+            const goTo = ctx.siblings[ctx.index + 1] || ctx.siblings[ctx.index - 1] || ctx.parent || treeData[0] || null;
+            ctx.siblings.splice(ctx.index, 1);
+            selectedId = goTo ? (goTo.id || goTo) : null;
+        }
+        function resizeTree(adjustment){
+            const app = document.querySelector('.app');
+            if (!app) return;
+
+            // Get the current grid-template-columns value
+            const style = window.getComputedStyle(app);
+            const gridCols = style.getPropertyValue('grid-template-columns').split(' ');
+
+            // Parse the first column (tree width)
+            let treeWidth = parseInt(gridCols[0]);
+            if (isNaN(treeWidth)) return;
+
+            treeWidth += adjustment;
+
+            if (treeWidth < 240) {
+                treeWidth = 240;
+            }
+
+            // Update the grid-template-columns
+            app.style.gridTemplateColumns = `${treeWidth}px 1fr`;
+        }
+        function insertHr() {
+            const insertText = "--------------------------------------------------------------------------------";
+            const start = editorArea.selectionStart;
+            const end = editorArea.selectionEnd;
+
+            // Insert at the cursor position
+            const text = editorArea.value;
+            editorArea.value = text.slice(0, start) + insertText + text.slice(end);
+
+            // Move the cursor to the end of the inserted text
+            editorArea.selectionStart = editorArea.selectionEnd = start + insertText.length;
+
+            syncFile();
+        }
+
+
+        //---- Options ---------------------------------------------------------
+        function openOptionsDialog() {
+            optShowInitHelp.checked = showInitHelp;
+            optFileName.value = fileName;
+            optModeVim.checked = mode_vim;
+            optionsDialog.style.display = 'block';
+            optionIndex = 0;
+            optionFields[optionIndex].focus();
+        }
+        function closeOptionsDialog() {
+            optionsDialog.style.display = 'none';
+        }
+        function saveOptionsDialog() {
+            showInitHelp = optShowInitHelp.checked;
+            fileName = optFileName.value || fileName;
+            mode_vim = optModeVim.checked;
+            closeOptionsDialog();
+        }
+
+
+
+        //---- Links -----------------------------------------------------------
+        function openLinksDialog() {
+            showingLinks = true;
+            const info = findNodeAndParentById(selectedId);
+            if (!info || !info.node.content) return;
+
+            const content = safeRestoreText(info.node.content);
+            const urlRegex = /\bhttps?:\/\/[^\s]+/gi;
+            const nodeLinkRegex = /(?:^|\s)_(.+?)_(?=\s|[.,!?;:)]|$)/g;
+
+            const urlMatches = content.match(urlRegex) || [];
+
+            // Collect node links
+            let nodeMatches = [];
+            let match;
+            while ((match = nodeLinkRegex.exec(content)) !== null) {
+                nodeMatches.push(match[1]);
+            }
+
+            const listEl = document.getElementById('linksList');
+            listEl.innerHTML = '';
+
+            if (urlMatches.length === 0 && nodeMatches.length === 0) {
+                listEl.innerHTML = '<p>No links found.</p>';
+            } else {
+                // Render URL links
+                urlMatches.forEach(url => {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.target = '_blank';
+                    a.textContent = url;
+                    listEl.appendChild(a);
+                    listEl.appendChild(document.createElement('br'));
+                });
+
+                // Render Node links
+                nodeMatches.forEach(title => {
+                    const lowerTitle = title.toLowerCase();
+                    let foundNode = null;
+
+                    // Search only node titles (like `:query`)
+                    (function walk(nodes) {
+                        for (const n of nodes) {
+                            if (n.title && n.title.toLowerCase() === lowerTitle) {
+                                foundNode = n;
+                                return;
+                            }
+                            if (n.children && n.children.length) walk(n.children);
+                            if (foundNode) return; // early exit if found
+                        }
+                    })(treeData);
+
+                    const link = document.createElement('a');
+                    link.href = '#';
+                    link.textContent = title;
+
+                    if (foundNode) {
+                        link.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            expandToNode(foundNode.id);
+                            selectedId = foundNode.id;
+                            closeLinksDialog();
+                            render();
+                        });
+                    } else {
+                        link.style.color = '#888';
+                        link.title = 'Node not found';
+                    }
+
+                    listEl.appendChild(link);
+                    listEl.appendChild(document.createElement('br'));
+                });
+            }
+
+            document.getElementById('linksDialog').style.display = 'block';
+        }
+
+        function closeLinksDialog() {
+            showingLinks = false;
+            document.getElementById('linksDialog').style.display = 'none';
+        }
+
+        function openHistoryDialog() {
+            showingHistory = true;
+            historyIndex = 0;
+            renderHistoryList();
+            document.getElementById('historyDialog').style.display = 'block';
+        }
+        
+        function closeHistoryDialog() {
+            showingHistory = false;
+            document.getElementById('historyDialog').style.display = 'none';
+        }
+        
+        function renderHistoryList() {
+            const listEl = document.getElementById('historyList');
+            listEl.innerHTML = '';
+            const recent = historyStack.slice(-15).reverse(); // latest first
+            recent.forEach((entry, i) => {
+                const div = document.createElement('div');
+                div.textContent = entry.title;
+                if (i === historyIndex) {
+                    div.classList.add('selected');
+                    div.style.background = '#444'; // ensure visible
+                }
+                listEl.appendChild(div);
+            });
+        }
+
+
+
+
+
+        //---- Finding and Replacing -------------------------------------------
+        function openReplaceDialog() {
+            finding = true;
+            document.getElementById('searchText').value = '';
+            document.getElementById('replaceText').value = '';
+            document.getElementById('replaceDialog').style.display = 'block';
+            document.getElementById('searchText').focus();
+        }
+
+        function closeReplaceDialog() {
+            finding = false;
+            document.getElementById('replaceDialog').style.display = 'none';
+        }
+
+        function doFind() {
+            const info = findNodeAndParentById(selectedId);
+            if (!info) return;
+
+            const searchVal = document.getElementById('searchText').value;
+            const resultsEl = document.getElementById('replaceResults');
+            const area = document.getElementById('editorArea');
+
+            if (!searchVal) {
+                resultsEl.textContent = 'Enter something to search for.';
+                return;
+            }
+
+            const content = safeRestoreText(info.node.content) || '';
+            // Escape user input for regex
+            const regex = new RegExp(searchVal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+
+            // Create a list of match start indexes
+            findMatches = [];
+            let match;
+            while ((match = regex.exec(content)) !== null) {
+                findMatches.push({ start: match.index, end: match.index + match[0].length });
+            }
+
+            if (findMatches.length === 0) {
+                resultsEl.textContent = 'No matches found.';
+                return;
+            }
+
+            // Cycle to the next match
+            if (findIndex >= findMatches.length) findIndex = 0;
+            const current = findMatches[findIndex];
+
+            // Move the caret/selection to the match
+            area.focus();
+            area.setSelectionRange(current.start, current.end);
+
+            resultsEl.textContent = `Match ${findIndex + 1} of ${findMatches.length}`;
+            findIndex++;
+        }
+
+        function doReplaceAll() {
+            const info = findNodeAndParentById(selectedId);
+            if (!info) return;
+
+            const searchVal = document.getElementById('searchText').value;
+            const replaceVal = document.getElementById('replaceText').value;
+            const resultsEl = document.getElementById('replaceResults');
+
+            if (!searchVal) {
+                resultsEl.textContent = 'Enter something to search for.';
+                return;
+            }
+
+            const regex = new RegExp(searchVal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+            let content = safeRestoreText(info.node.content) || '';
+            const matchCount = (content.match(regex) || []).length;
+
+            if (matchCount > 0) {
+                content = content.replace(regex, replaceVal);
+                info.node.content = safeStoreText(content);
+                render();
+                resultsEl.textContent = `Replaced ${matchCount} occurrence(s).`;
+            } else {
+                resultsEl.textContent = 'No matches found.';
+            }
+
+            syncFile();
+        }
+
+        const searchInputEl = document.getElementById('searchText');
+        const replaceInputEl = document.getElementById('replaceText');
+
+        replaceInputEl.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                doReplaceAll(); // replaces all
+                closeReplaceDialog();
+            }
+        });
+
+
+
+
+
+
+
+
+
+        //---- Search ----------------------------------------------------------
+        function openSearch() {
+            searchActive = true;
+            searchDialog.style.display = 'flex';
+            searchInput.value = '';
+            searchInput.focus();
+            searchMatches = [];
+            searchIndex = 0;
+            renderSearchList();
+        }
+
+        function closeSearch() {
+            searchActive = false;
+            searchDialog.style.display = 'none';
+        }
+
+        function searchTree(query) {
+            searchMatches = [];
+            const matchContent = !query.startsWith(':');
+            const q = query.startsWith(':') ? query.slice(1).toLowerCase() : query.toLowerCase();
+            (function walk(nodes) {
+                for (const n of nodes) {
+                    if ((n.title && n.title.toLowerCase().includes(q)) || (matchContent && n.content && n.content.toLowerCase().includes(q))) {
+                        searchMatches.push(n);
+                    }
+                    if (n.children && n.children.length) walk(n.children);
+                }
+            })(treeData);
+            searchIndex = 0;
+            renderSearchList();
+        }
+
+        function renderSearchList() {
+            searchList.innerHTML = '';
+            searchMatches.forEach((n, i) => {
+                const item = document.createElement('div');
+                item.textContent = n.title || '(untitled)';
+                if (i === searchIndex) item.classList.add('selected');
+                item.addEventListener('click', () => {
+                    selectSearchResult(i);
+                });
+                searchList.appendChild(item);
+            });
+            if (searchMatches.length === 0) {
+                const empty = document.createElement('div');
+                empty.textContent = '(no matching nodes)';
+                empty.style.color = '#888';
+                searchList.appendChild(empty);
+            }
+        }
+
+        function selectSearchResult(i) {
+            if (i < 0 || i >= searchMatches.length) return;
+            searchIndex = i;
+            expandToNode(searchMatches[i].id);
+            selectedId = searchMatches[i].id;
+            render();
+            renderSearchList();
+        }
+
+        function expandToNode(id) {
+            let info = findNodeAndParentById(id);
+            while (info && info.parent) {
+                info.parent.expanded = true;
+                info = findNodeAndParentById(info.parent.id);
+            }
+        }
+
+        searchInput.addEventListener('input', e => {
+            searchTree(e.target.value);
+        });
+
+        searchInput.addEventListener('keydown', e => {
+            if (e.key === 'ArrowDown') {
+                searchIndex = Math.min(searchIndex + 1, searchMatches.length - 1);
+                renderSearchList();
+                e.preventDefault();
+            } else if (e.key === 'ArrowUp') {
+                searchIndex = Math.max(searchIndex - 1, 0);
+                renderSearchList();
+                e.preventDefault();
+            } else if (e.key === 'Enter') {
+                if (searchMatches.length > 0) {
+                    selectSearchResult(searchIndex);
+                    closeSearch();
+                }
+            } else if (e.key === 'Escape' || e.key === 'q') {
+                closeSearch();
+            }
+        });
+
+
+        function saveAsHtml(currentFileName) {
+            let name = currentFileName;
+            let saveName = false;
+            if (name === "") {
+                name = prompt("Save as .html (enter name without extension):", "");
+                if (!name) return;
+                saveName = true;
+            }
+
+            const elemLimit = 20; // Number of elements per line
+            const htmlDoc = document.documentElement.cloneNode(true);
+
+            // Make sure the latest database is stored
+            const latestDatabase = JSON.parse(JSON.stringify(treeData));
+
+            const lines = [];
+            for (let i = 0; i < latestDatabase.length; i += elemLimit) {
+                let chunk = latestDatabase.slice(i, i + elemLimit);
+                lines.push(JSON.stringify(chunk).slice(1, -1)); // Strip [ and ]
+            }
+            let formattedDatabase = `[\n  ${lines.join(",\n  ")}\n]`;
+
+            // Ensure correct replacement of the old database
+            let htmlContent = "<!DOCTYPE html>" + htmlDoc.outerHTML;
+            if (saveName) {
+                htmlContent = htmlContent.replace(/let\s+fileName\s*=\s*"([^"]*)";/, `let fileName = "${name}";`);
+            } else {
+                // fileName
+                htmlContent = htmlContent.replace(
+                  /let\s+fileName\s*=\s*"([^"]*)";/,
+                  `let fileName = "${fileName}";`
+                );
+            }
+
+            // showInitHelp
+            htmlContent = htmlContent.replace(
+              /let\s+showInitHelp\s*=\s*(true|false);/,
+              `let showInitHelp = ${showInitHelp};`
+            );
+            
+            // mode_vim
+            htmlContent = htmlContent.replace(
+              /let\s+mode_vim\s*=\s*(true|false);/,
+              `let mode_vim = ${mode_vim};`
+            );
+
+            htmlContent = htmlContent.replace(/let\s+treeData\s*=\s*\[[\s\S]*?\];/, `let treeData = ${formattedDatabase};`);
+
+            let blob = new Blob([htmlContent], { type: "text/html" });
+            let a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `${name}.html`;
+            a.click();
+        }
+
+
+        //---- Key Handling ----------------------------------------------------
+        function handleGlobalKey(e){
+            if (editing) {
+                // Check if Ctrl (or Command on Mac) is held and the "-" key is pressed
+                if ((e.ctrlKey || e.metaKey) && (e.key === "-" || e.code === "Minus")) {
+                    e.preventDefault(); // optional: prevents browser zoom-out
+                    insertHr();
+                }
+
+                return;
+            }
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+            if (finding) {
+                switch (e.key) {
+                    case 'Escape':
+                        closeReplaceDialog();
+                        break;
+
+                    case "Enter":
+                        doFind();
+                        break;
+                }
+
+                return;
+            }
+
+            if (e.key === '/' && !editing && !dialogOpen()) {
+                openSearch();
+                e.preventDefault();
+                return;
+            }
+
+            if (searchActive) return;
+
+            const k = e.key; // compare exact letter; do not rely on shift state
+            let did = true;
+
+            if (dialogOpen()) {
+                return;
+            }
+
+            switch (k) {
+                case 'i':
+                    if (!readOnly) {
+                        e.preventDefault();
+                        const info = findNodeAndParentById(selectedId); if (!info) return;
+                        editing = true; render();
+                        editorArea.focus();
+                        editorArea.setSelectionRange(0, 0); 
+                        scrollToCursor();
+                        if (mode_vim) {
+                            setVimMode(false);
+                            return;
+                         } else {
+                            setVimMode(true);
+                            return;
+                         }
+                    }
+                    break;
+                case 'Escape':
+                    if (showingLinks) {
+                        closeLinksDialog();
+                        e.preventDefault();
+                    }
+                    else {
+                        did = false;
+                    }
+                    break; // handled in textarea
+                case 'f': if (!editing) openReplaceDialog(); break;
+                case 'r': if (!readOnly) addRoot(); break;
+                case 'R': if (!readOnly) renameFolder(); break;
+                case 'j': selectNextSibling(false); break;
+                case 'k': selectPrevSibling(false); break;
+                case ',': selectNextSibling(true); break;
+                case '.': selectPrevSibling(true); break;
+                case 'l': moveRight(); break;
+                case 'h': moveLeft(true); break;
+                case 'u': moveLeft(false); break;
+                case 'C': collapseAll(); break;
+                case 'E': expandAll(); break;
+                case 'g': gotoTop(); break;
+                case 'G': gotoBottom(); break;
+                case 'A': if (!readOnly) addChild(); break;
+                case 'a': if (!readOnly) addAfter(); break;
+                case 'H': if (!readOnly) moveOutToParent(); break;
+                case 'L': if (!readOnly) moveIntoAsChild(); break;
+                case 'J': if (!readOnly) reorderAmongSiblings('down'); break;
+                case 'K': if (!readOnly) reorderAmongSiblings('up'); break;
+                case 'D': if (!readOnly) deleteNode(); break;
+                case 's': if (!readOnly) saveAsHtml(fileName); break;
+                case 'S': if (!readOnly) saveAsHtml(""); break;
+                case ']': resizeTree(30); break;
+                case '[': resizeTree(-30); break;
+                case '#': openLinksDialog(); break;
+                case 'X': openMissingLinksDialog(); break;
+                case '<':
+                    openHistoryDialog();
+                    e.preventDefault();
+                    return;
+                default: did = false; break;
+            }
+            if (did) { e.preventDefault(); render(); }
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === '?' && !editing && !dialogOpen()) {
+                helpDialog.style.display = 'block';
+                e.preventDefault();
+                return;
+            }
+            if (optionsDialog.style.display === 'block') {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveOptionsDialog();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeOptionsDialog();
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    optionIndex = (optionIndex + 1) % optionFields.length;
+                    optionFields[optionIndex].focus();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    optionIndex = (optionIndex - 1 + optionFields.length) % optionFields.length;
+                    optionFields[optionIndex].focus();
+                } else if (e.key === ' ') {
+                    // Toggle checkbox if that's the active element
+                    if (document.activeElement.type === 'checkbox') {
+                        e.preventDefault();
+                        document.activeElement.checked = !document.activeElement.checked;
+                    }
+                }
+            } else if (e.key === '!' && !editing && !readOnly && !dialogOpen()) {
+                e.preventDefault();
+                openOptionsDialog();
+            }
+            if (e.key === 'V' && !editing && !dialogOpen()) {
+                if (mode_vim) {
+                    helpDialogVimEdit.style.display = 'block';
+                } else {
+                    helpDialogVimDisabled.style.display = 'block';
+                }
+                e.preventDefault();
+                return;
+            }
+            if (e.key === 'U' && !editing && !dialogOpen()) {
+                document.getElementById('filePicker').click()
+            }
+
+            if (e.key === 'Escape') {
+                repeatCount = 1;
+
+                if (helpDialog.style.display === 'block') {
+                    helpDialog.style.display = 'none';
+                    e.stopPropagation();
+                    return;
+                } else if (helpDialogVimEdit.style.display === 'block') {
+                    helpDialogVimEdit.style.display = 'none';
+                    e.stopPropagation();
+                    return;
+                } else if (helpDialogVimDisabled.style.display === 'block') {
+                    helpDialogVimDisabled.style.display = 'none';
+                    e.stopPropagation();
+                } else {
+                    selectedNode = null;
+                }
+            }
+        });
+
+        window.addEventListener('keydown', handleGlobalKey, { capture: true });
+
+        function escapeForScript(json){
+            return json.replace(/<\//g, '<\\/'); // avoid closing script tags
+        }
+
+        function dialogActive() {
+
+        }
+
+    let linksIndex = 0;
+    let linksCount = 0;
+
+    function openLinksDialog() {
+        showingLinks = true;
+        linksIndex = 0;
+        const info = findNodeAndParentById(selectedId);
+        if (!info || !info.node.content) return;
+
+        const content = safeRestoreText(info.node.content);
+        const urlRegex = /\bhttps?:\/\/[^\s]+/gi;
+        const nodeLinkRegex = /(?:^|\s)_(.+?)_(?=\s|[.,!?;:)]|$)/g;
+
+        const urlMatches = content.match(urlRegex) || [];
+
+        let nodeMatches = [];
+        let match;
+        while ((match = nodeLinkRegex.exec(content)) !== null) {
+            nodeMatches.push(match[1]);
+        }
+
+        // Deduplicate using Set
+        const uniqueUrls = [...new Set(urlMatches)];
+        const uniqueNodes = [...new Set(nodeMatches.map(n => n.trim()))];
+
+        const listEl = document.getElementById('linksList');
+        listEl.innerHTML = '';
+
+        if (uniqueUrls.length === 0 && uniqueNodes.length === 0) {
+            listEl.innerHTML = '<p>No links found.</p>';
+        } else {
+            uniqueUrls.forEach(url => {
+                const a = document.createElement('a');
+                a.href = url;
+                a.target = '_blank';
+                a.textContent = url;
+                listEl.appendChild(a);
+            });
+
+            uniqueNodes.forEach(title => {
+                const lowerTitle = title.toLowerCase();
+                let foundNode = null;
+
+                (function walk(nodes) {
+                    for (const n of nodes) {
+                        if (n.title && n.title.toLowerCase() === lowerTitle) {
+                            foundNode = n;
+                            return;
+                        }
+                        if (n.children && n.children.length) walk(n.children);
+                        if (foundNode) return;
+                    }
+                })(treeData);
+
+                const link = document.createElement('a');
+                link.href = '#';
+                link.textContent = title;
+
+                if (foundNode) {
+                    link.dataset.nodeId = foundNode.id;
+                } else {
+                    link.style.color = '#888';
+                    link.title = 'Node not found';
+                }
+
+                listEl.appendChild(link);
+            });
+        }
+
+        const links = listEl.querySelectorAll('a');
+        linksCount = links.length;
+        if (linksCount > 0) {
+            links[0].classList.add('selected');
+        }
+
+        document.getElementById('linksDialog').style.display = 'block';
+    }
+
+    function openMissingLinksDialog() {
+        showingLinks = true;
+        const nodeLinkRegex = /(?:^|\s)_(.+?)_(?=\s|[.,!?;:)]|$)/g;
+
+        // Gather all node titles (case-insensitive)
+        const allTitles = new Set();
+        (function walkTitles(nodes) {
+            for (const n of nodes) {
+                if (n.title) {
+                    allTitles.add(n.title.trim().toLowerCase());
+                }
+                if (n.children && n.children.length) walkTitles(n.children);
+            }
+        })(treeData);
+
+        // Map of missingLink → set of nodes that reference it
+        const missingMap = new Map();
+
+        (function walk(nodes) {
+            for (const n of nodes) {
+                if (n.content) {
+                    let seenInThisNode = new Set(); // avoid dupes within the same note
+                    let match;
+                    while ((match = nodeLinkRegex.exec(n.content)) !== null) {
+                        const linkTitle = match[1].trim();
+                        if (!allTitles.has(linkTitle.toLowerCase())) {
+                            if (!seenInThisNode.has(linkTitle.toLowerCase())) {
+                                if (!missingMap.has(linkTitle)) {
+                                    missingMap.set(linkTitle, []);
+                                }
+                                missingMap.get(linkTitle).push({
+                                    nodeId: n.id,
+                                    nodeTitle: n.title || '(untitled)'
+                                });
+                                seenInThisNode.add(linkTitle.toLowerCase());
+                            }
+                        }
+                    }
+                }
+                if (n.children && n.children.length) walk(n.children);
+            }
+        })(treeData);
+
+        const listEl = document.getElementById('linksList');
+        listEl.innerHTML = '';
+
+        if (missingMap.size === 0) {
+            listEl.innerHTML = '<p>No missing links found</p>';
+        } else {
+            listEl.innerHTML = '<p>Missing Links:</p>';
+            for (const [missingTitle, refs] of missingMap.entries()) {
+                refs.forEach(ref => {
+                    const container = document.createElement('div');
+
+                    const link = document.createElement('a');
+                    link.href = '#';
+                    link.textContent = `"${missingTitle}" — linked from: ${ref.nodeTitle}`;
+                    link.style.color = '#888';
+                    link.title = 'Missing link — click to go to note';
+
+                    // Clicking takes you to the referencing note
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        expandToNode(ref.nodeId);
+                        selectedId = ref.nodeId;
+                        closeLinksDialog();
+                        render();
+                    });
+
+                    container.appendChild(link);
+                    listEl.appendChild(container);
+                });
+            }
+        }
+
+        document.getElementById('linksDialog').style.display = 'block';
+    }
+
+    function activateSelectedLink() {
+        const listEl = document.getElementById('linksList');
+        const links = listEl.querySelectorAll('a');
+        if (linksIndex < 0 || linksIndex >= links.length) return;
+        const link = links[linksIndex];
+        if (link.dataset.nodeId) {
+            expandToNode(link.dataset.nodeId);
+            selectedId = link.dataset.nodeId;
+            closeLinksDialog();
+            render();
+        } else {
+            link.click();
+        }
+    }
+
+    function handleLinksKey(e) {
+        if (!showingLinks) return;
+        const listEl = document.getElementById('linksList');
+        const links = listEl.querySelectorAll('a');
+        if (links.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            links[linksIndex].classList.remove('selected');
+            linksIndex = (linksIndex + 1) % links.length;
+            links[linksIndex].classList.add('selected');
+            e.preventDefault();
+        } else if (e.key === 'ArrowUp') {
+            links[linksIndex].classList.remove('selected');
+            linksIndex = (linksIndex - 1 + links.length) % links.length;
+            links[linksIndex].classList.add('selected');
+            e.preventDefault();
+        } else if (e.key === 'Enter') {
+            activateSelectedLink();
+            e.preventDefault();
+        } else if (e.key === 'Escape') {
+            closeLinksDialog();
+            e.preventDefault();
+        }
+    }
+
+    function handleHistoryKey(e) {
+        if (!showingHistory) return;
+        if (e.key === 'ArrowDown') {
+            historyIndex = Math.min(historyIndex + 1, Math.min(14, historyStack.length - 1));
+            renderHistoryList();
+            e.preventDefault();
+        } else if (e.key === 'ArrowUp') {
+            historyIndex = Math.max(historyIndex - 1, 0);
+            renderHistoryList();
+            e.preventDefault();
+        } else if (e.key === 'Enter') {
+            const recent = historyStack.slice(-15).reverse();
+            if (recent[historyIndex]) {
+                expandToNode(recent[historyIndex].id);
+                selectedId = recent[historyIndex].id;
+                closeHistoryDialog();
+                render();
+            }
+            e.preventDefault();
+        } else if (e.key === 'Escape' || e.key === 'q') {
+            closeHistoryDialog();
+            e.preventDefault();
+        }
+        return;
+    }
+
+    function dialogOpen() {
+        let openDialog = false;
+
+        if (helpDialog.style.display === "block") {
+            openDialog = true;
+        }
+        if (helpDialogVimEdit.style.display === "block") {
+            openDialog = true;
+        }
+        if (helpDialogVimDisabled.style.display === "block") {
+            openDialog = true;
+        }
+        if (optionsDialog.style.display === "block") {
+            openDialog = true;
+        }
+        if (searchDialog.style.display === "flex") {
+            openDialog = true;
+        }
+        if (replaceDialog.style.display === "block") {
+            openDialog = true;
+        }
+
+        return openDialog;
+    }
+
+
+
+    document.getElementById("filePicker").addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            file.text().then(content => {
+                const match = content.match(/let\s+treeData\s*=\s*(\[[\s\S]*?\]);/);
+                if (!match) {
+                    alert("No treeData found in selected file.");
+                    return;
+                }
+
+                try {
+                    const importedTreeData = JSON.parse(match[1]);
+
+                    // Replace current in-memory treeData
+                    treeData = importedTreeData;
+
+                    alert("treeData imported successfully!");
+
+                    selectedId = treeData[0]?.id || null;
+
+                    // Re-render with new data
+                    render();
+                } catch (err) {
+                    console.error("Failed to parse treeData:", err);
+                    alert("Error parsing treeData.");
+                }
+            });
+        }
+    });
+
+
+
+
+    window.addEventListener('keydown', handleHistoryKey, { capture: true });
+    window.addEventListener('keydown', handleLinksKey, { capture: true });
+
+    //---- Init ------------------------------------------------------------
+    window.addEventListener('load', function() {
+        if (readOnly) {
+            document.getElementById('authorHelp').style.display = 'none';
+            document.getElementById('readerHelp').style.display = 'block';
+            document.getElementById('authorHelpVim').style.display = 'none';
+            document.getElementById('readerHelpVim').style.display = 'block';
+            document.getElementById('mode').style.display = 'none';
+            document.getElementById('replaceTools').style.display = 'none';
+        } else {
+            document.getElementById('authorHelpVim').style.display = 'block';
+            document.getElementById('readerHelpVim').style.display = 'none';
+            document.getElementById('mode').style.display = 'block';
+            document.getElementById('replaceTools').style.display = 'block';
+        }
+
+        if (showInitHelp) {
+            helpDialog.style.display = 'block';
+        }
+
+        selectedId = treeData[0]?.id || null;
+        render();
+    });
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body></html>
