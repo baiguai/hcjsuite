@@ -1,7 +1,7 @@
-<!DOCTYPE html><html style="--app-height: 987px;"><head>
+<!DOCTYPE html><html style="--app-height: 981px;"><head>
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1" name="viewport">
-<title>Httree</title>
+<title>Vummel Help</title>
 <style>
     .app {
         display: grid;
@@ -251,7 +251,8 @@
         top: 10%;
         left: 50%;
         transform: translateX(-50%);
-        width: 600px;
+        width: 90%;                /* take almost full width on mobile */
+        max-width: 600px;          /* cap at desktop size */
         max-height: 70%;
         background: #222;
         color: #fff;
@@ -498,6 +499,9 @@ G = Select bottom tree node
 
 y = Copy note node
 p = Paste copied note node
+
+Control+- = Insert horizontal line
+Control+* = Convert selection to list
                     </pre>
                 </td>
                 <td style="vertical-align: top; padding-left: 10px;">
@@ -801,6 +805,7 @@ variable to true in this .html file.
         }
         function isFolder(n){ return (n.content || "").trim().length === 0; }
         function updateTitleFromContent(n){
+            if (n.content === "") return;
             const firstLine = (n.content||"").split(/\r?\n/)[0].trim();
             if (firstLine) n.title = firstLine.slice(0, 80);
             else if (!n.title || !n.title.startsWith("New")) n.title = "New Folder";
@@ -913,7 +918,6 @@ variable to true in this .html file.
                     modeEl.textContent = 'TREE';
                     editing = false;
                     mode_insert = false;
-                    mode_vim = false;
                     if (n.children.length) {
                         n.expanded = !n.expanded; // toggle when clicking row
                         editorArea.content = "";
@@ -990,8 +994,17 @@ variable to true in this .html file.
 
         editorArea.addEventListener('click', () => {
             mode_insert = true;
-            mode_vim = false;
-            editing = true; render();
+            editing = true;
+            render();
+
+            // Close dialogs - this is for mobile envs
+            closeOptionsDialog();
+            closeLinksDialog();
+            closeHistoryDialog();
+            closeMarksDialog();
+            closeReplaceDialog();
+            closeSearch();
+
             editorArea.focus();
             // editorArea.setSelectionRange(0, 0); 
             // scrollToCursor();
@@ -1169,6 +1182,31 @@ variable to true in this .html file.
         
             // Execute commands with repeat count
             let performed = false;
+
+
+            if (mode === "VISUAL") {
+                // Add bullet '*' at start of current line
+                if (e.key === "*") {
+                    e.preventDefault();
+                    const text = editorArea.value;
+                    const pos = editorArea.selectionStart;
+            
+                    // Find start of current line
+                    const lineStart = text.lastIndexOf("\n", pos - 1) + 1;
+                    const lineEnd = text.indexOf("\n", pos);
+                    const before = text.substring(0, lineStart);
+                    const after = text.substring(lineStart);
+            
+                    editorArea.value = before + "* " + after;
+            
+                    // keep caret in same column, but shifted by 2 chars
+                    editorArea.selectionStart = editorArea.selectionEnd = pos + 2;
+            
+                    showMessage("Bullet added");
+                    return;
+                }
+            }
+
         
             switch (e.key) {
                 case "i": // Enter insert mode
@@ -1534,7 +1572,6 @@ variable to true in this .html file.
             modeEl.textContent = 'TREE';
             editing = false;
             mode_insert = false;
-            mode_vim = false;
         }
 
         function setVimMode(insertMode) {
@@ -1823,7 +1860,7 @@ variable to true in this .html file.
             if (!info || !info.node.content) return;
 
             const content = safeRestoreText(info.node.content);
-            const urlRegex = /\bhttps?:\/\/[^\s]+/gi;
+            const urlRegex = /\b(http|file)s?:\/\/[^\s]+/gi;
             const nodeLinkRegex = /(?:^|\s)_(.+?)_(?=\s|[.,!?;:)]|$)/g;
 
             const urlMatches = content.match(urlRegex) || [];
@@ -2379,8 +2416,47 @@ variable to true in this .html file.
                     insertHr();
                 }
 
+                if ((e.ctrlKey || e.metaKey) && (
+                        e.key === "*" ||
+                        (e.key === "8" && e.shiftKey) ||            // some browsers report "8" + shift
+                        (e.code === "Digit8" && e.shiftKey)         // fallback to code check
+                    )) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                
+                    const start = editorArea.selectionStart;
+                    const end = editorArea.selectionEnd;
+                    const text = editorArea.value;
+                
+                    // Expand selection to full lines
+                    const lineStart = text.lastIndexOf("\n", start - 1) + 1;
+                    const lineEnd = (text.indexOf("\n", end) === -1 ? text.length : text.indexOf("\n", end));
+                
+                    const before = text.substring(0, lineStart);
+                    const selected = text.substring(lineStart, lineEnd);
+                    const after = text.substring(lineEnd);
+                
+                    // Prefix non-empty lines with "* "
+                    const bulleted = selected
+                        .split("\n")
+                        .map(line => line.trim().length ? `* ${line}` : line)
+                        .join("\n");
+                
+                    editorArea.value = before + bulleted + after;
+                
+                    // Reselect the transformed text
+                    editorArea.selectionStart = lineStart;
+                    editorArea.selectionEnd = lineStart + bulleted.length;
+                
+                    // Persist model & UI
+                    syncFile();               // update node.content and re-render title
+                    showMessage("Converted to bulleted list");
+                    return;
+                }
+
                 return;
             }
+
             if (e.ctrlKey || e.metaKey || e.altKey) return;
 
             if (finding) {
@@ -2848,6 +2924,7 @@ variable to true in this .html file.
     function toggleMobileMenu() {
         if (mobileMenu.style.display === "none") {
             mobileMenu.style.display = "block";
+            mode_vim = false;
         } else {
             mobileMenu.style.display = "none";
         }
@@ -2888,6 +2965,7 @@ variable to true in this .html file.
     
     function openTreeDialog() {
         treeDialog.style.display = 'block';
+        mode_vim = false;
 
         if (readOnly) {
             addNodeBtn.style.display = "none";
